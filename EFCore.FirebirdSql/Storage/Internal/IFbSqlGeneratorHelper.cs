@@ -1,5 +1,5 @@
-﻿/*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+/*
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -14,13 +14,12 @@
  *
  */
 
-using EFCore.FirebirdSql.FunctionalTests.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities;
+using Microsoft.EntityFrameworkCore.Storage;
 
-namespace Microsoft.EntityFrameworkCore
+namespace EntityFrameworkCore.FirebirdSql.Storage.Internal
 {
-    public class F1FirebirdFixture : F1RelationalFixture
+    public interface IFbSqlGenerationHelper : ISqlGenerationHelper
     {
-        protected override ITestStoreFactory TestStoreFactory => FirebirdTestStoreFactory.Instance;
+        string ParameterName { get; set; }
     }
 }

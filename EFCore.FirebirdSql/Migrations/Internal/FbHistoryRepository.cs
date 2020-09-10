@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -20,6 +20,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EntityFrameworkCore.FirebirdSql.Migrations.Internal
 {
@@ -37,10 +38,10 @@ namespace EntityFrameworkCore.FirebirdSql.Migrations.Internal
         }
 
         protected override string ExistsSql
-        {
+        { 
             get
             {
-                var escapedTableName = SqlGenerationHelper.EscapeLiteral(TableName);
+                var stringTypeMapping = Dependencies.TypeMappingSource.GetMapping(typeof(string));
                 return $@"
 SELECT COUNT(*)
 FROM rdb$relations r
@@ -49,7 +50,7 @@ WHERE
     AND
     rdb$view_blr IS NULL
     AND
-    rdb$relation_name = '{escapedTableName}'";
+    rdb$relation_name = '{stringTypeMapping.GenerateSqlLiteral(TableName)}'";
             }
         }
 

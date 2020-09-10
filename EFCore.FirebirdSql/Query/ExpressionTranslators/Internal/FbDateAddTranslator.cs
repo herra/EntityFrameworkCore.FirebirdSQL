@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -57,12 +57,14 @@ namespace EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal
                 }
 
                 return new SqlFunctionExpression(
-                 functionName: "DATEADD",
-                 returnType: methodCallExpression.Type,
-                 arguments: new[]
-                 {
-                        new SqlFragmentExpression(dateInfo), amountToAdd, methodCallExpression.Object
-                 });
+                     functionName: "DATEADD",
+                     returnType: methodCallExpression.Type,
+                     arguments: new[]
+                     {
+                         new SqlFragmentExpression(dateInfo),
+                         amountToAdd,
+                         methodCallExpression.Object
+                     });
             }
 
             return null;

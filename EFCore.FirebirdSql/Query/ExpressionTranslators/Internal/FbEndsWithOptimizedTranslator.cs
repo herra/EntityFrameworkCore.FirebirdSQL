@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -30,12 +30,11 @@ namespace EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal
             if (Equals(methodCallExpression.Method, _methodInfo))
             {
                 var patternExpression = methodCallExpression.Arguments[0];
-                var patternConstantExpression = patternExpression as ConstantExpression;
 
                 var endsWithExpression = new NullCompensatedExpression(
                     Expression.Equal(
                         new SqlFunctionExpression(
-                            "RIGHT", 
+                            "RIGHT",
                             methodCallExpression.Object.Type,
                             new[]
                             {
@@ -44,7 +43,7 @@ namespace EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal
                             }),
                         patternExpression));
 
-                return patternConstantExpression != null
+                return patternExpression is ConstantExpression patternConstantExpression
                     ? (string)patternConstantExpression.Value == string.Empty
                         ? (Expression)Expression.Constant(true)
                         : endsWithExpression

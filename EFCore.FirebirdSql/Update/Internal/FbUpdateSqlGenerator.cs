@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -15,297 +15,205 @@
  */
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using EntityFrameworkCore.FirebirdSql.Extensions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Update;
 using EntityFrameworkCore.FirebirdSql.Infrastructure.Internal;
+using EntityFrameworkCore.FirebirdSql.Storage.Internal;
+using System.Collections.Generic;
 
 namespace EntityFrameworkCore.FirebirdSql.Update.Internal
 {
+
     public class FbUpdateSqlGenerator : UpdateSqlGenerator, IFbUpdateSqlGenerator
     {
-        private readonly IRelationalTypeMapper _typeMapperRelational;
-        private string _commaAppend;
+        private readonly IRelationalTypeMappingSource _typeMapper;
         private string _typeReturn;
 
         public FbUpdateSqlGenerator(
             UpdateSqlGeneratorDependencies dependencies,
-            IRelationalTypeMapper typeMapper,
+            IRelationalTypeMappingSource typeMapper,
             IFbOptions fbOptions)
             : base(dependencies)
         {
-            _typeMapperRelational = typeMapper;
+            _typeMapper = typeMapper;
             _typeReturn = fbOptions.IsLegacyDialect ? "INT" : "BIGINT";
         }
 
-        public ResultSetMapping AppendBulkInsertOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition)
+        public override ResultSetMapping AppendInsertOperation(StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
         {
-            commandStringBuilder.Clear();
-            _commaAppend = variablesParameters.Length > 0 ? "," : string.Empty;
-            var resultMapping = ResultSetMapping.LastInResultSet;
-            for (var i = 0; i < modificationCommands.Count; i++)
+            var result = ResultSetMapping.NoResultSet;
+            var name = command.TableName;
+            var operations = command.ColumnModifications;
+            var writeOperations = operations.Where(o => o.IsWrite).ToList();
+            var readOperations = operations.Where(o => o.IsRead).ToList();
+            var anyRead = readOperations.Any();
+            AppendInsertCommandHeader(commandStringBuilder, name, null, writeOperations);
+            AppendValuesHeader(commandStringBuilder, writeOperations);
+            AppendValues(commandStringBuilder, writeOperations);
+            if (anyRead)
             {
-                var name = modificationCommands[i].TableName;
-                var schema = modificationCommands[i].Schema;
-                var operations = modificationCommands[i].ColumnModifications;
-                var writeOperations = operations.Where(o => o.IsWrite).ToArray();
-                var readOperations = operations.Where(o => o.IsRead).ToArray();
-
-                if (readOperations.Length > 0 && dataReturnField.Length == 0)
-                {
-                    AppendReturnOutputBlock(dataReturnField, readOperations, operations);
-                }
-                else if (readOperations.Length == 0 && dataReturnField.Length == 0)
-                {
-                    dataReturnField.AppendLine($"RETURNS (AffectedRows {_typeReturn}) AS BEGIN");
-                    dataReturnField.AppendLine("AffectedRows=0;");
-                }
-
-                if (writeOperations.Any())
-                {
-                    AppendBlockVariable(variablesParameters, writeOperations);
-                }
-
-                AppendInsertCommandHeader(commandStringBuilder, name, schema, writeOperations);
-                AppendValuesHeader(commandStringBuilder, writeOperations);
-                AppendValuesInsert(commandStringBuilder, writeOperations);
-                if (readOperations.Length > 0)
-                {
-                    AppendInsertOutputClause(commandStringBuilder, readOperations, operations);
-                    resultMapping = ResultSetMapping.LastInResultSet;
-                }
-                else if (readOperations.Length == 0)
-                {
-                    AppendSelectAffectedCountCommand(commandStringBuilder, name, schema, commandPosition);
-                    resultMapping = ResultSetMapping.NotLastInResultSet;
-                }
-            }
-            return resultMapping;
-        }
-
-        public ResultSetMapping AppendBulkUpdateOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition)
-        {
-            if (dataReturnField.Length == 0)
-            {
-                dataReturnField.AppendLine($"RETURNS (AffectedRows {_typeReturn}) AS BEGIN");
-                dataReturnField.AppendLine("AffectedRows=0;");
-            }
-            commandStringBuilder.Clear();
-            _commaAppend = variablesParameters.Length > 0 ? "," : string.Empty;
-            for (var i = 0; i < modificationCommands.Count; i++)
-            {
-                var name = modificationCommands[i].TableName;
-                var operations = modificationCommands[i].ColumnModifications;
-                var writeOperations = operations.Where(o => o.IsWrite).ToArray();
-                var conditionsOperations = operations.Where(o => o.IsCondition).ToArray();
-
-                if (writeOperations.Any())
-                {
-                    AppendBlockVariable(variablesParameters, writeOperations);
-                }
-
-                commandStringBuilder
-                    .Append($"UPDATE {SqlGenerationHelper.DelimitIdentifier(name)} SET ")
-                    .AppendJoinUpadate(
-                        writeOperations,
-                        SqlGenerationHelper,
-                        (sb, o, helper) =>
-                        {
-                            if (o.IsWrite)
-                            {
-                                sb.Append(SqlGenerationHelper.DelimitIdentifier(o.ColumnName))
-                                    .Append(" = ")
-                                    .Append($":{o.ParameterName}");
-                            }
-                        });
-
-                if (conditionsOperations.Any())
-                {
-                    AppendBlockVariable(variablesParameters, conditionsOperations);
-                }
-
-                AppendWhereClauseCustom(commandStringBuilder, conditionsOperations);
-                commandStringBuilder.AppendLine(SqlGenerationHelper.StatementTerminator);
-                AppendUpdateOrDeleteOutputClause(commandStringBuilder);
-                commandStringBuilder.AppendLine("SUSPEND;");
-            }
-            return ResultSetMapping.NotLastInResultSet;
-        }
-
-        public ResultSetMapping AppendBulkDeleteOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition)
-        {
-            if (dataReturnField.Length == 0)
-            {
-                dataReturnField.AppendLine($"RETURNS (AffectedRows {_typeReturn}) AS BEGIN");
-                dataReturnField.AppendLine("AffectedRows=0;");
-            }
-
-            var name = modificationCommands[0].TableName;
-            _commaAppend = variablesParameters.Length > 0 ? "," : string.Empty;
-            for (var i = 0; i < modificationCommands.Count; i++)
-            {
-                var operations = modificationCommands[i].ColumnModifications;
-                var conditionsOperations = operations.Where(o => o.IsCondition).ToArray();
-                if (conditionsOperations.Any())
-                {
-                    AppendBlockVariable(variablesParameters, conditionsOperations);
-                }
-                commandStringBuilder.Append("DELETE FROM ");
-                commandStringBuilder.Append(SqlGenerationHelper.DelimitIdentifier(name));
-                AppendWhereClauseCustom(commandStringBuilder, conditionsOperations);
-                commandStringBuilder.AppendLine(SqlGenerationHelper.StatementTerminator);
-                AppendUpdateOrDeleteOutputClause(commandStringBuilder);
-                commandStringBuilder.AppendLine("SUSPEND;");
-            }
-            return ResultSetMapping.NotLastInResultSet;
-        }
-
-        private void AppendBlockVariable(StringBuilder variablesParameters, IReadOnlyList<ColumnModification> operations)
-        {
-            foreach (var column in operations)
-            {
-                var _type = GetDataType(column.Property);
-                variablesParameters.Append(_commaAppend);
-                variablesParameters.Append($"{column.ParameterName}  {_type}=@{column.ParameterName}");
-                _commaAppend = ",";
-            }
-        }
-
-        private void AppendValuesInsert(StringBuilder commandStringBuilder, IReadOnlyList<ColumnModification> operations)
-        {
-            if (operations.Count > 0)
-            {
-                commandStringBuilder
-                    .Append("(")
-                    .AppendJoin(operations, SqlGenerationHelper, (sb, o, helper) =>
-                    {
-                        if (o.IsWrite)
-                        {
-                            sb.Append(":").Append(o.ParameterName);
-                        }
-                    })
-                    .Append(")");
-            }
-        }
-
-        private void AppendWhereClauseCustom(StringBuilder commandStringBuilder, ColumnModification[] columns)
-        {
-            if (columns.FirstOrDefault(p => p.IsCondition) == null)
-            {
-                return;
-            }
-
-            commandStringBuilder
-                .Append(" WHERE ")
-                .AppendJoin(columns, SqlGenerationHelper, (sb, o, helper) =>
-                {
-                    if (o.IsCondition)
-                    {
-                        sb.Append(SqlGenerationHelper.DelimitIdentifier(o.ColumnName))
-                            .Append(" = ")
-                            .Append($":{o.ParameterName}");
-                    }
-                }, " AND ");
-        }
-
-        private void AppendUpdateOrDeleteOutputClause(StringBuilder commandStringBuilder)
-            => commandStringBuilder.AppendLine("   AffectedRows=AffectedRows+1;");
-
-        private void AppendInsertOutputClause(StringBuilder commandStringBuilder, IReadOnlyList<ColumnModification> operations, IReadOnlyList<ColumnModification> allOperations)
-            => commandStringBuilder
-                .Append(" RETURNING ")
-                .AppendJoin(operations, (b, e) =>
+                commandStringBuilder.AppendLine();
+                commandStringBuilder.Append("RETURNING ");
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
                 {
                     b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
-                }, ", ")
-                .Append(" INTO ")
-                .AppendJoin(operations, (b, e) =>
-                {
-                    b.Append($":{e.ColumnName}");
-                }, ", ")
-                .AppendLine(SqlGenerationHelper.StatementTerminator)
-                .AppendLine("SUSPEND;");
+                }, ", ");
+                result = ResultSetMapping.LastInResultSet;
+            }
+            commandStringBuilder.Append(SqlGenerationHelper.StatementTerminator).AppendLine();
+            return result;
+        }
 
-
-        private void AppendReturnOutputBlock(StringBuilder commandStringBuilder, IReadOnlyList<ColumnModification> operations, IReadOnlyList<ColumnModification> allOperations)
-            => commandStringBuilder
-                .Append(" RETURNS (")
-                .AppendJoin(operations, (b, e) =>
-                {
-                    b.Append(e.ColumnName);
-                    b.Append(" ");
-                    b.Append(GetDataType(e.Property));
-
-                }, ", ")
-                .AppendLine(") AS BEGIN");
-
-        protected override ResultSetMapping AppendSelectAffectedCountCommand(StringBuilder commandStringBuilder, string name, string schema, int commandPosition)
+        public override ResultSetMapping AppendUpdateOperation(StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
         {
-            commandStringBuilder
-                .AppendLine(" RETURNING ROW_COUNT INTO :AffectedRows;")
-                .AppendLine("SUSPEND;");
+            var sqlGenerationHelper = (IFbSqlGenerationHelper)SqlGenerationHelper;
+            var name = command.TableName;
+            var operations = command.ColumnModifications;
+            var writeOperations = operations.Where(o => o.IsWrite).ToList();
+            var readOperations = operations.Where(o => o.IsRead).ToList();
+            var conditionOperations = operations.Where(o => o.IsCondition).ToList();
+            var inputOperations = GetParameters(operations.Where(o => o.IsWrite || o.IsCondition));
+            var anyRead = readOperations.Any();
+            commandStringBuilder.Append("EXECUTE BLOCK (");
+            commandStringBuilder.AppendJoin(inputOperations, (o, p) =>
+            {
+                o.Append(p.Key);
+                o.Append(" ");
+                o.Append(p.Value);
+                o.Append(" = ?");
+            }, ", "); 
+            commandStringBuilder.AppendLine(")");
+            commandStringBuilder.Append("RETURNS (");
+            if (anyRead)
+            {
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
+                {
+                    var type = GetColumnType(e);
+                    b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
+                    b.Append(" ");
+                    b.Append(type);
+                }, ", ");
+            }
+            else
+            {
+                commandStringBuilder.Append($"RowsAffected {_typeReturn}");
+            }
+            commandStringBuilder.AppendLine(")");
+            commandStringBuilder.AppendLine("AS");
+            commandStringBuilder.AppendLine("BEGIN");
+            var oldParameterNameMarker = sqlGenerationHelper.ParameterName;
+            sqlGenerationHelper.ParameterName = ":";
+            try
+            {
+                AppendUpdateCommandHeader(commandStringBuilder, name, null, writeOperations);
+                AppendWhereClause(commandStringBuilder, conditionOperations);
+            }
+            finally
+            {
+                sqlGenerationHelper.ParameterName = oldParameterNameMarker;
+            }
+            if (anyRead)
+            {
+                commandStringBuilder.AppendLine();
+                commandStringBuilder.Append("RETURNING ");
 
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
+                {
+                    b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
+                }, ", ");
+                commandStringBuilder.Append(" INTO ");
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
+                {
+                    b.Append(" :");
+                    b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
+                }, ", ");
+            }
+            commandStringBuilder.Append(SqlGenerationHelper.StatementTerminator).AppendLine();
+            if (!anyRead)
+            {
+                commandStringBuilder.AppendLine("RowsAffected = ROW_COUNT;");
+                commandStringBuilder.AppendLine("SUSPEND;");
+            }
+            else
+            {
+                commandStringBuilder.AppendLine("IF (ROW_COUNT > 0) THEN");
+                commandStringBuilder.AppendLine("SUSPEND;");
+            }
+            commandStringBuilder.Append("END");
+            commandStringBuilder.Append(SqlGenerationHelper.StatementTerminator).AppendLine();
             return ResultSetMapping.LastInResultSet;
         }
 
-        protected override void AppendRowsAffectedWhereCondition(StringBuilder commandStringBuilder, int expectedRowsAffected)
-            => throw new NotImplementedException();
+        public override ResultSetMapping AppendDeleteOperation(StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
+        {
+            var sqlGenerationHelper = (IFbSqlGenerationHelper)SqlGenerationHelper;
+            var name = command.TableName;
+            var operations = command.ColumnModifications;
+            var conditionOperations = operations.Where(o => o.IsCondition).ToList();
+            var inputOperations = GetParameters(conditionOperations);
+            commandStringBuilder.Append("EXECUTE BLOCK (");
+            commandStringBuilder.AppendJoin(inputOperations, (o, p) =>
+            {
+                o.Append(p.Key);
+                o.Append(" ");
+                o.Append(p.Value);
+                o.Append(" = ?");
+            }, ", ");
+            commandStringBuilder.AppendLine(")");
+            commandStringBuilder.AppendLine($"RETURNS (RowsAffected {_typeReturn})");
+            commandStringBuilder.AppendLine("AS");
+            commandStringBuilder.AppendLine("BEGIN");
+            var oldParameterNameMarker = sqlGenerationHelper.ParameterName;
+            sqlGenerationHelper.ParameterName = ":";
+            try
+            {
+                AppendDeleteCommandHeader(commandStringBuilder, name, null);
+                AppendWhereClause(commandStringBuilder, conditionOperations);
+            }
+            finally
+            {
+                sqlGenerationHelper.ParameterName = oldParameterNameMarker;
+            }
+            commandStringBuilder
+                .Append(SqlGenerationHelper.StatementTerminator)
+                .AppendLine();
+            commandStringBuilder.AppendLine();
+            commandStringBuilder.AppendLine("RowsAffected = ROW_COUNT;");
+            commandStringBuilder.AppendLine("SUSPEND;");
+            commandStringBuilder.Append("END");
+            commandStringBuilder
+                .Append(SqlGenerationHelper.StatementTerminator)
+                .AppendLine();
+            return ResultSetMapping.LastInResultSet;
+        }
 
         protected override void AppendIdentityWhereCondition(StringBuilder commandStringBuilder, ColumnModification columnModification)
-            => throw new NotImplementedException();
+            => throw new InvalidOperationException();
 
-        private string GetDataType(IProperty property)
+        protected override void AppendRowsAffectedWhereCondition(StringBuilder commandStringBuilder, int expectedRowsAffected)
+            => throw new InvalidOperationException();
+
+        string GetColumnType(ColumnModification column)
+            => _typeMapper.GetMapping(column.Property).StoreType;
+
+        private  Dictionary<string,string> GetParameters(IEnumerable<ColumnModification> columns)
         {
-            var typeName = property.Firebird().ColumnType;
-            if (typeName == null)
+            var parameters = new Dictionary<string, string>();
+            foreach (var item in columns)
             {
-                var propertyDefault = property.FindPrincipal();
-                typeName = propertyDefault?.Firebird().ColumnType;
-                if (typeName == null)
+                var type = GetColumnType(item);
+                if (item.UseCurrentValueParameter)
                 {
-                    if (property.ClrType == typeof(string))
-                    {
-                        typeName = _typeMapperRelational.StringMapper?.FindMapping(property.IsUnicode()
-                            ?? propertyDefault?.IsUnicode()
-                            ?? true, false, null).StoreType;
-                    }
-
-                    else if (property.ClrType == typeof(byte[]))
-                    {
-                        typeName = _typeMapperRelational.ByteArrayMapper?.FindMapping(false, false, null).StoreType;
-                    }
-                    else
-                    {
-                        typeName = _typeMapperRelational.FindMapping(property.ClrType).StoreType;
-                    }
+                    parameters.Add(item.ParameterName, type); 
+                }
+                if (item.UseOriginalValueParameter)
+                {
+                    parameters.Add(item.OriginalParameterName, type);
                 }
             }
-            if (property.ClrType == typeof(byte[]) && typeName != null)
-            {
-                return "BLOB SUB_TYPE BINARY";
-            }
-            return typeName;
+            return parameters;
         }
     }
 }

@@ -1,11 +1,11 @@
 /*
-*          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+*          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
 *
 *                    EntityFrameworkCore.FirebirdSql
 *
 * THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED
 * OR IMPLIED.  ANY USE IS AT YOUR OWN RISK.
-* 
+*
 * Permission is hereby granted to use or copy this program
 * for any purpose,  provided the above notices are retained on all copies.
 * Permission to modify the code and to distribute modified code is granted,
@@ -20,6 +20,7 @@ using EntityFrameworkCore.FirebirdSql.Metadata.Conventions;
 using EntityFrameworkCore.FirebirdSql.Migrations;
 using EntityFrameworkCore.FirebirdSql.Migrations.Internal;
 using EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal;
+using EntityFrameworkCore.FirebirdSql.Query.ExpressionVisitors.Internal;
 using EntityFrameworkCore.FirebirdSql.Query.Sql.Internal;
 using EntityFrameworkCore.FirebirdSql.Storage.Internal;
 using EntityFrameworkCore.FirebirdSql.Storage.Internal.Mapping;
@@ -28,7 +29,9 @@ using EntityFrameworkCore.FirebirdSql.ValueGeneration.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
+using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
 using Microsoft.EntityFrameworkCore.Query.Sql;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
@@ -44,8 +47,7 @@ namespace Microsoft.Extensions.DependencyInjection
             var builder = new EntityFrameworkRelationalServicesBuilder(serviceCollection)
                 .TryAdd<IRelationalDatabaseCreator, FbDatabaseCreator>()
                 .TryAdd<IDatabaseProvider, DatabaseProvider<FbOptionsExtension>>()
-                .TryAdd<IRelationalTypeMapper, FbTypeMapper>()
-                .TryAdd<IRelationalCommandBuilderFactory, FbCommandBuilderFactory>()
+                .TryAdd<IRelationalTypeMappingSource, FbTypeMappingSource>()
                 .TryAdd<ISqlGenerationHelper, FbSqlGenerationHelper>()
                 .TryAdd<IMigrationsAnnotationProvider, FbMigrationsAnnotationProvider>()
                 .TryAdd<IConventionSetBuilder, FbConventionSetBuilder>()
@@ -61,6 +63,8 @@ namespace Microsoft.Extensions.DependencyInjection
                 .TryAdd<ICompositeMethodCallTranslator, FbCompositeMethodCallTranslator>()
                 .TryAdd<IQuerySqlGeneratorFactory, FbQuerySqlGeneratorFactory>()
                 .TryAdd<ISingletonOptions, IFbOptions>(p => p.GetService<IFbOptions>())
+                .TryAdd<ISqlTranslatingExpressionVisitorFactory, FbSqlTranslatingExpressionVisitorFactory>()
+                .TryAdd<IQueryCompilationContextFactory, FbCompilationQueryableFactory>()
                 .TryAddProviderSpecificServices(b => b
                     .TryAddSingleton<IFbOptions, FbOptions>()
                     .TryAddScoped<IFbUpdateSqlGenerator, FbUpdateSqlGenerator>()

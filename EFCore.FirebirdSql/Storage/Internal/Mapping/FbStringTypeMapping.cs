@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -17,8 +17,9 @@
 using System.Data.Common;
 using FirebirdSql.Data.FirebirdClient;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
-namespace EntityFrameworkCore.FirebirdSql.Storage.Internal
+namespace EntityFrameworkCore.FirebirdSql.Storage.Internal.Mapping
 {
     public class FbStringTypeMapping : StringTypeMapping
     {
@@ -30,6 +31,17 @@ namespace EntityFrameworkCore.FirebirdSql.Storage.Internal
 
         protected override void ConfigureParameter(DbParameter parameter)
             => ((FbParameter)parameter).FbDbType = _fbDbType;
+
+        protected FbStringTypeMapping(RelationalTypeMappingParameters parameters)
+            : base(parameters)
+        {
+        }
+
+        public override CoreTypeMapping Clone(ValueConverter converter)
+            => new FbStringTypeMapping(Parameters.WithComposedConverter(converter));
+
+        public override RelationalTypeMapping Clone(string storeType, int? size)
+           => new FbStringTypeMapping(Parameters.WithStoreTypeAndSize(storeType, size));
 
         protected override string GenerateNonNullSqlLiteral(object value)
             => IsUnicode

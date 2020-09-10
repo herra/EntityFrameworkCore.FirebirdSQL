@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -27,15 +27,15 @@ namespace EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal
 {
     public class FbConvertTranslator : IMethodCallTranslator
     {
-        private static readonly Dictionary<string, string> TypeMapping = new Dictionary<string, string>
+        private static readonly Dictionary<string, string> _typeMapping = new Dictionary<string, string>
         {
             [nameof(Convert.ToByte)] = "SMALLINT",
-            [nameof(Convert.ToDecimal)] = $"DECIMAL({FbTypeMapper.DefaultDecimalPrecision},{FbTypeMapper.DefaultDecimalScale})",
+            [nameof(Convert.ToDecimal)] = $"DECIMAL({FbTypeMappingSource.DefaultDecimalPrecision},{FbTypeMappingSource.DefaultDecimalScale})",
             [nameof(Convert.ToDouble)] = "DOUBLE PRECISION",
             [nameof(Convert.ToInt16)] = "SMALLINT",
             [nameof(Convert.ToInt32)] = "INTEGER",
             [nameof(Convert.ToInt64)] = "BIGINT",
-            [nameof(Convert.ToString)] = $"VARCHAR({FbTypeMapper.VarcharMaxSize})"
+            [nameof(Convert.ToString)] = $"VARCHAR({FbTypeMappingSource.VarcharMaxSize})"
         };
 
         private static readonly HashSet<Type> _suportedTypes = new HashSet<Type>
@@ -52,7 +52,7 @@ namespace EntityFrameworkCore.FirebirdSql.Query.ExpressionTranslators.Internal
         };
 
         private static readonly IEnumerable<MethodInfo> _supportedMethods
-            = TypeMapping
+            = _typeMapping
                 .Keys
                 .SelectMany(t => typeof(Convert).GetTypeInfo()
                 .GetDeclaredMethods(t)

@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -14,33 +14,11 @@
  *
  */
 
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.EntityFrameworkCore.Update;
 
 namespace EntityFrameworkCore.FirebirdSql.Update.Internal
 {
     public interface IFbUpdateSqlGenerator : IUpdateSqlGenerator
-    {
-        ResultSetMapping AppendBulkInsertOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition);
-
-        ResultSetMapping AppendBulkUpdateOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition);
-
-        ResultSetMapping AppendBulkDeleteOperation(
-            StringBuilder commandStringBuilder,
-            StringBuilder variablesParameters,
-            StringBuilder dataReturnField,
-            IReadOnlyList<ModificationCommand> modificationCommands,
-            int commandPosition);
+    { 
     }
 }

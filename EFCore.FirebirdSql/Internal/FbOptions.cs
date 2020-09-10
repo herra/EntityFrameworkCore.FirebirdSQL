@@ -1,11 +1,11 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
  * THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED
  * OR IMPLIED.  ANY USE IS AT YOUR OWN RISK.
- * 
+ *
  * Permission is hereby granted to use or copy this program
  * for any purpose,  provided the above notices are retained on all copies.
  * Permission to modify the code and to distribute modified code is granted,
@@ -17,17 +17,33 @@
 using System;
 using EntityFrameworkCore.FirebirdSql.Infrastructure.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Firebird = FirebirdSql.Data.FirebirdClient;
-using Data = FirebirdSql.Data.Services;
 
 namespace EntityFrameworkCore.FirebirdSql.Internal
 {
+    using Firebird = global::FirebirdSql.Data.FirebirdClient; 
+    using Data = global::FirebirdSql.Data.Services;
     public class FbOptions : IFbOptions
     {
+        private bool IsLegacy { get; set; }
         public FbOptionsExtension Settings { get; private set; }
         public Version ServerVersion { get; private set; }
-        public bool IsLegacyDialect { get; private set; }
-        public int ObjectLengthName => (ServerVersion ?? GetSettings(Settings.ConnectionString).ServerVersion).Major == 3 ? 31 : 63;
+        public bool IsLegacyDialect
+        {
+            get
+            {
+                if (ServerVersion == null && Settings != null)
+                {
+                    GetSettings(Settings.ConnectionString);
+                }
+                return IsLegacy;
+            }
+            set => IsLegacy = value;
+        }
+        
+        public int ObjectLengthName
+            => (ServerVersion ?? GetSettings(Settings.ConnectionString).ServerVersion).Major == 3
+            ? 31
+            : 63;
 
         public virtual void Initialize(IDbContextOptions options) => Settings = GetOptions(options);
 
@@ -38,11 +54,27 @@ namespace EntityFrameworkCore.FirebirdSql.Internal
 
         private FbOptions GetSettings(string connectionString)
         {
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                connectionString = Settings.Connection.ConnectionString;
+            }
             if (ServerVersion != null)
             {
                 return this;
             }
 
+            try
+            {
+                IsLagacyDataBase(connectionString);
+            }
+            catch(Exception)
+            { 
+            }
+            return this;
+        }
+
+        private void IsLagacyDataBase(string connectionString)
+        {
             try
             {
                 using (var connection = new Firebird.FbConnection(connectionString))
@@ -52,16 +84,14 @@ namespace EntityFrameworkCore.FirebirdSql.Internal
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "SELECT MON$SQL_DIALECT FROM MON$DATABASE";
-                        IsLegacyDialect = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                        IsLegacy = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
                     }
                     connection.Close();
                 }
             }
-            catch
+            finally
             {
-                //
             }
-            return this;
         }
     }
 }

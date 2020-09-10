@@ -1,4 +1,7 @@
 
+# Efforts should be redirected to: 
+https://github.com/cincuranet/FirebirdSql.Data.FirebirdClient
+
 EntityFrameworkCore.FirebirdSql for Firebird Server
 =====================
 [![label](https://img.shields.io/github/issues-raw/badges/shields/website.svg?style=plastic)](https://github.com/ralmsdeveloper/EntityFrameworkCore.FirebirdSql)
@@ -9,7 +12,7 @@ EntityFrameworkCore.FirebirdSql for Firebird Server
 
 Provider               | Package name                              | Stable (`master` branch)    | On test (`dev` branch)
 -----------------------|-------------------------------------------|-----------------------------|-------------------------
-Firebird SQL           | `EntityFrameworkCore.FirebirdSql` | [![NuGet](https://img.shields.io/nuget/v/EntityFrameworkCore.FirebirdSql.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/EntityFrameworkCore.FirebirdSql/) |  [![NuGet](https://img.shields.io/nuget/v/EntityFrameworkCore.FirebirdSql.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/EntityFrameworkCore.FirebirdSql/)
+Firebird SQL           | `EntityFrameworkCore.FirebirdSql` | [![NuGet](https://img.shields.io/nuget/v/EntityFrameworkCore.FirebirdSql.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/EntityFrameworkCore.FirebirdSql/) |  [![NuGet](https://img.shields.io/nuget/vpre/EntityFrameworkCore.FirebirdSql.svg?style=flat-square&label=nuget)](https://www.nuget.org/packages/EntityFrameworkCore.FirebirdSql/)
 
 
 The EntityFrameworkCore.FirebirdSql is an Entity Framework Core access provider for Firebird SQL, compatible with version 3.X and earlier versions 2.x.

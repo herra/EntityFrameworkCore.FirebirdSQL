@@ -1,11 +1,11 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
  * THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED
  * OR IMPLIED.  ANY USE IS AT YOUR OWN RISK.
- * 
+ *
  * Permission is hereby granted to use or copy this program
  * for any purpose,  provided the above notices are retained on all copies.
  * Permission to modify the code and to distribute modified code is granted,
@@ -21,36 +21,39 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EntityFrameworkCore.FirebirdSql.Storage.Internal
 {
-    public class FbSqlGenerationHelper : RelationalSqlGenerationHelper
+    public class FbSqlGenerationHelper : RelationalSqlGenerationHelper, IFbSqlGenerationHelper
     {
-        private readonly IFbOptions _options;
+        private readonly IFbOptions _fbOptions;
+        public string ParameterName { get; set; }
+        private string Escape => (bool)_fbOptions?.IsLegacyDialect ? "" : "\"";
 
         public FbSqlGenerationHelper(RelationalSqlGenerationHelperDependencies dependencies, IFbOptions options)
             : base(dependencies)
         {
-            _options = options;
+            ParameterName = "@";
+            _fbOptions = options;
         }
 
         public override string EscapeIdentifier(string identifier)
-            => identifier.MaxLength(_options.ObjectLengthName); 
+            => identifier.MaxLength(_fbOptions.ObjectLengthName);
 
         public override void EscapeIdentifier(StringBuilder builder, string identifier)
-            => builder.Append(identifier.MaxLength(_options.ObjectLengthName)); 
+            => builder.Append(identifier.MaxLength(_fbOptions.ObjectLengthName));
 
         public override string DelimitIdentifier(string identifier)
-            => $"\"{EscapeIdentifier(identifier)}\"";
+            => $"{Escape}{EscapeIdentifier(identifier)}{Escape}";
 
         public override void DelimitIdentifier(StringBuilder builder, string identifier)
         {
-            builder.Append('"');
-            EscapeIdentifier(builder, identifier.MaxLength(_options.ObjectLengthName));
-            builder.Append('"');
+            builder.Append(Escape);
+            EscapeIdentifier(builder, identifier.MaxLength(_fbOptions.ObjectLengthName));
+            builder.Append(Escape);
         }
 
         public override string GenerateParameterName(string name)
-            => $"@{name.MaxLength(_options.ObjectLengthName)}";
+            => $"{ParameterName}{name.MaxLength(_fbOptions.ObjectLengthName)}";
 
         public override void GenerateParameterName(StringBuilder builder, string name)
-            => builder.Append("@").Append(name.MaxLength(_options.ObjectLengthName)); 
+            => builder.Append(ParameterName).Append(name.MaxLength(_fbOptions.ObjectLengthName));
     }
 }

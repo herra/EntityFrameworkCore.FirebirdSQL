@@ -1,5 +1,5 @@
 /*
- *          Copyright (c) 2017 Rafael Almeida (ralms@ralms.net)
+ *          Copyright (c) 2017-2018 Rafael Almeida (ralms@ralms.net)
  *
  *                    EntityFrameworkCore.FirebirdSql
  *
@@ -18,7 +18,7 @@ using FirebirdSql.Data.FirebirdClient;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace EntityFrameworkCore.FirebirdSql.Storage
+namespace EntityFrameworkCore.FirebirdSql.Storage.Internal.Mapping
 { 
     public class FbGuidTypeMapping : GuidTypeMapping
     {
